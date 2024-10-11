@@ -70,6 +70,8 @@ namespace space2a.CustomDestinationParser
                         offset += jumpFileEntry.Shortcut.Size - (3);
                     }
 
+                    if (offset >= data.Length || offset + 4 >= data.Length)
+                        return jumpFileCategories;
                     if (BitConverter.ToInt32(data[offset..(offset + 4)]) != -1161823317) //should not be needed
                     {
                         //Fixing the offset
