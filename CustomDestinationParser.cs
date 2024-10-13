@@ -2,20 +2,21 @@
 
 using Securify.ShellLink;
 
-namespace space2a.CustomDestinationParser
+namespace space2a
 {
     public static class CustomDestinationParser
     {
+        private static byte[] referenceLnkGuid = new byte[] { 1, 20, 2, 0, 0, 0, 0, 0, 192, 0, 0, 0, 0, 0, 0, 70 }; //00021401-0000-0000-c000-000000000046
+        private static int decimalSignature = -1161823317; //BABFFBAB
+
         public static JumpFileCategory[] Parse(string filePath, int fixRange = 12)
         {
             byte[] data = File.ReadAllBytes(filePath);
 
-            //FILE HEADER
-
-            byte[] referenceLnkGuid = new byte[] { 1, 20, 2, 0, 0, 0, 0, 0, 192, 0, 0, 0, 0, 0, 0, 70 }; //00021401-0000-0000-c000-000000000046
 
             int offset = 0;
 
+            //FILE HEADER
             int formatVersion = BitConverter.ToInt32(data[offset..(offset += 4)]); //0, 4
             int numberOfCategories = BitConverter.ToInt32(data[offset..(offset += 4)]); //4, 8
             int unknown = BitConverter.ToInt32(data[offset..(offset += 4)]); //8, 12
@@ -72,12 +73,13 @@ namespace space2a.CustomDestinationParser
 
                     if (offset >= data.Length || offset + 4 >= data.Length)
                         return jumpFileCategories;
-                    if (BitConverter.ToInt32(data[offset..(offset + 4)]) != -1161823317) //should not be needed
+
+                    if (BitConverter.ToInt32(data[offset..(offset + 4)]) != decimalSignature) //should not be needed
                     {
                         //Fixing the offset
                         for (int i = -fixRange; i < fixRange; i++)
                         {
-                            if (BitConverter.ToInt32(data[(offset + i)..((offset + i) + 4)]) == -1161823317)
+                            if (BitConverter.ToInt32(data[(offset + i)..((offset + i) + 4)]) == decimalSignature)
                             {
                                 offset = offset + i;
                                 break;
@@ -124,11 +126,18 @@ namespace space2a.CustomDestinationParser
             {
                 get
                 {
-                    try
+                    try //ugly but works
                     {
                         if (Shortcut.StringData != null && !String.IsNullOrWhiteSpace(Shortcut.StringData.NameString)) return Shortcut.StringData.NameString;
 
-                        return Shortcut.ExtraData.PropertyStoreDataBlock.PropertyStore[0].PropertyStorage[0].TypedPropertyValue.Value.ToString();
+                        for (int i = 0; i < Shortcut.ExtraData.PropertyStoreDataBlock.PropertyStore.Count; i++)
+                        {
+                            try
+                            {
+                                return Shortcut.ExtraData.PropertyStoreDataBlock.PropertyStore[i].PropertyStorage[0].TypedPropertyValue.Value.ToString();
+                            }
+                            catch (Exception) { }
+                        }
                     }
                     catch (Exception) { }
                     return null;
