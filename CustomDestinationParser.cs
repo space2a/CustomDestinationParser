@@ -26,24 +26,44 @@ namespace space2a
             //FILE CATEGORIES
             for (int c = 0; c < numberOfCategories; c++)
             {
-                JumpFileCategory jumpFileCategory = new JumpFileCategory();
-                jumpFileCategories[c] = jumpFileCategory;
-
-                int categoryType = BitConverter.ToInt32(data[offset..(offset += 4)]);
-                jumpFileCategory.JumpFileCategoryType = (JumpFileCategoryType)categoryType;
-
-                if (jumpFileCategory.JumpFileCategoryType == JumpFileCategoryType.Custom || jumpFileCategory.JumpFileCategoryType == JumpFileCategoryType.UserTasks)
+                try
                 {
-                    if (jumpFileCategory.JumpFileCategoryType == JumpFileCategoryType.Custom)
+                    JumpFileCategory jumpFileCategory = new JumpFileCategory();
+                    jumpFileCategories[c] = jumpFileCategory;
+
+                    int categoryType = BitConverter.ToInt32(data[offset..(offset += 4)]);
+                    jumpFileCategory.JumpFileCategoryType = (JumpFileCategoryType)categoryType;
+
+                    int entries = -1;
+
+                    if (jumpFileCategory.JumpFileCategoryType == JumpFileCategoryType.Custom)                                                           //CUSTOM 0 
                     {
                         ushort categoryNameLength = BitConverter.ToUInt16(data[offset..(offset += 2)]);
-                        string categoryName = Encoding.Unicode.GetString(data[offset..(offset += categoryNameLength * 2)]);
-                        jumpFileCategory.Name = categoryName;
+                        jumpFileCategory.Name = Encoding.Unicode.GetString(data[offset..(offset += categoryNameLength * 2)]);
                     }
-                    else
-                        jumpFileCategory.Name = "Tasks";
+                    else if (jumpFileCategory.JumpFileCategoryType == JumpFileCategoryType.Known)                                                       //KNOWN 1
+                    {
+                        JumpFileCategoryIdentifier identifier = (JumpFileCategoryIdentifier)BitConverter.ToInt32(data[offset..(offset += 4)]);
 
-                    int entries = BitConverter.ToInt32(data[offset..(offset += 4)]);
+                        if ((int)identifier <= 0 && BitConverter.ToInt32(data[offset..(offset + 4)]) == decimalSignature)
+                        {
+                            int unknown2 = BitConverter.ToInt32(data[(offset += 4)..(offset += 4)]);
+
+                            ushort categoryNameLength = BitConverter.ToUInt16(data[offset..(offset += 2)]);
+                            jumpFileCategory.Name = Encoding.Unicode.GetString(data[offset..(offset += categoryNameLength * 2)]);
+
+                            entries = BitConverter.ToUInt16(data[offset..(offset += 2)]);
+                        }
+                        else continue; //cannot read it
+                    }
+                    else if (jumpFileCategory.JumpFileCategoryType == JumpFileCategoryType.UserTasks)                                                   //USERTASK 2
+                        jumpFileCategory.Name = "Tasks";
+                    else                                                                                                                                //UNKNOWN
+                        Console.WriteLine($"Unknown category ({categoryType})");
+
+                    if (entries == -1)
+                        entries = BitConverter.ToInt32(data[offset..(offset += 4)]);
+
                     jumpFileCategory.Entries = new JumpFileEntry[entries];
 
                     for (int e = 0; e < entries; e++)
@@ -89,15 +109,9 @@ namespace space2a
 
                     jumpFileCategory.Signature = BitConverter.ToInt32(data[offset..(offset += 4)]).ToString("X");
                 }
-                else if (jumpFileCategory.JumpFileCategoryType == JumpFileCategoryType.Known)
+                catch (Exception)
                 {
-                    offset += 4;
-                    // /!\ if you want the category identifier, comment the line above and uncomment the one below /!\
-                    //JumpFileCategoryIdentifier identifier = (JumpFileCategoryIdentifier)BitConverter.ToInt32(data[offset..(offset += 4)]); 
-                }
-                else
-                {
-                    Console.WriteLine("Unsupported JumpFileCategoryType " + categoryType);
+
                 }
             }
 
@@ -134,7 +148,11 @@ namespace space2a
                         {
                             try
                             {
-                                return Shortcut.ExtraData.PropertyStoreDataBlock.PropertyStore[i].PropertyStorage[0].TypedPropertyValue.Value.ToString();
+                                for (int l = 0; l < Shortcut.ExtraData.PropertyStoreDataBlock.PropertyStore[i].PropertyStorage.Count; l++)
+                                {
+                                    string n = Shortcut.ExtraData.PropertyStoreDataBlock.PropertyStore[i].PropertyStorage[l].TypedPropertyValue.Value.ToString();
+                                    if (!String.IsNullOrWhiteSpace(n)) return n;
+                                }
                             }
                             catch (Exception) { }
                         }
